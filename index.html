@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+
+		<script>
+			function removeHotspot (u){
+                    if (popupArray[u].timer > 0)
+                    {
+                        popupArray[u].timer = popupArray[u].timer - 10;
+                    }
+                    if (popupArray[u].timer <= 0)
+                    {
+                        popupArray[u].on = false;
+                        popupArray[u].timer = 0;
+                        document.getElementById(popupArray[u].id).setAttribute('visible', 'false');
+                    }
+            }
+			function updateTimer(u){
+			        if (popupArray[u].timer < 3300)
+			        {
+                        popupArray[u].timer = popupArray[u].timer + 20;
+                    }
+					if (popupArray[u].timer >= 3300)
+					{
+						document.getElementById(popupArray[u].id).setAttribute('visible','true');
+						popupArray[u].on = true;
+						popupArray[u].timer = 3300;
+
+					}
+			}
+			/* DOESN'T deal with scene changes-can put identifier in string and parse it*/
+			var hs1 = {id:'hotspot_1', inRadius: false, inAngle: false, timer: 0, on: false};
+            var hs2 = {id:'hotspot_2', inRadius: false, inAngle: false, timer: 0, on: false};
+			var popupArray = [hs1,hs2]; // array for the popup boxes
+			var len = popupArray.length;
+
+			AFRAME.registerComponent('tri-perimeter',{
+			    init:function()
+				{
+                   // var vectorT = new THREE.Vector3(12,0,-15);
+				    // set up vector for left perimeter (LP) and right perimeter (RP)
+                    this.angle_1 = document.querySelector('#CAMERA').object3D.rotation.y;
+
+
+                    //creates 45 degree angle
+					this.vectorRP = new THREE.Vector3(26,0,-26);
+					this.vectorMP = new THREE.Vector3(0,0,-26);
+				    this.vectorLP = new THREE.Vector3(-26,0,-26);
+                    this.axisY = new THREE.Vector3(0,1,0);
+				    //track axis change of camera's rotation on the y-axis
+
+
+
+
+				},
+                update:function(u)
+                {
+
+                },
+				tick:function() {
+					// update vectorRP and vectorLP with camera's rotation
+                    this.angle_2 = document.querySelector('#CAMERA').object3D.rotation.y; // - old angle;
+					this.angle_delta = this.angle_2-this.angle_1;
+
+                    this.vectorRP.applyAxisAngle(this.axisY,this.angle_delta);
+                    this.vectorMP.applyAxisAngle(this.axisY,this.angle_delta);
+                    this.vectorLP.applyAxisAngle(this.axisY,this.angle_delta);
+
+
+                    // update angle_1 with new beginning angle
+                    this.angle_1 = this.angle_2;
+
+                    //draw triangle
+                    var ball = document.querySelector('#RP');
+                    var ball2 = document.querySelector('#LP');
+                    var ball3 = document.querySelector('#MP');
+                    ball.setAttribute('position',{x: this.vectorRP.x, y: 0, z: this.vectorRP.z});
+                    ball2.setAttribute('position',{x: this.vectorLP.x, y: 0, z: this.vectorLP.z});
+                    ball3.setAttribute('position',{x: this.vectorMP.x, y: 0, z: this.vectorMP.z});
+                    let i=0;
+
+                    for (i=0; i < len;i++)
+                    {
+
+                        let popup = document.querySelector('#'+ popupArray[i].id).object3D.position;
+                        //calculate radius
+                        var radius = Math.sqrt(Math.pow(this.vectorRP.x, 2) + Math.pow(this.vectorRP.z, 2));
+                        // dist of popup from camera
+                        var dist = Math.sqrt(Math.pow((popup.x - 0), 2) + Math.pow((popup.z - 0), 2));
+
+
+                        if (dist < radius)
+                        {
+                            popupArray[i].inRadius = true;
+                        }
+                        else
+						{
+						    popupArray[i].inRadius = false;
+						}
+
+                        let vectorP = new THREE.Vector3(popup.x, 0, popup.z);
+
+
+						// check if point is with in sector
+                        let hotspotAngle = vectorP.angleTo(this.vectorMP) * (180/Math.PI);
+
+                        if (hotspotAngle <= 45)
+						{
+							popupArray[i].inAngle = true;
+						}
+						else if (hotspotAngle > 45)
+						{
+                            popupArray[i].inAngle = false;
+
+						}
+
+
+						if (popupArray[i].inRadius == true && popupArray[i].inAngle == true) // in view
+						{
+							if (popupArray[i].on == true && popupArray[i].timer == 3300)
+							{
+							    continue;
+							}
+							else
+							{
+							    updateTimer(i);
+							}
+						}
+						else	// not in view
+                        {
+
+                            // if timer is not at start
+                            //let u = i;
+                            if (popupArray[i].timer > 0 && popupArray[i].on == true)
+                            {
+                                removeHotspot(i);
+                            }
+
+							continue;
+						}
+                    }
+                }
+			});
+			AFRAME.registerComponent('head-tracker',{
+                schema: {
+                    popupbox: {type: 'string'},
+                },
+				init:function()
+				{
+					var degrees1 = 18*(Math.PI/180);
+					var degrees2 = 10*(Math.PI/180);
+					var degrees3 = 3*(Math.PI/180);
+
+					//calculate boundary
+
+					var rot_y1 = document.querySelector('#CAMERA').object3D.rotation.y;
+					var rot_x1 = document.querySelector('#CAMERA').object3D.rotation.x;
+					var rot_z1 = document.querySelector('#CAMERA').object3D.rotation.z;
+
+
+
+					this.yRL = rot_y1+degrees1;		// rotate/tilt phone left
+					this.yRR = rot_y1-degrees1;		// rotate/tilt phone right
+
+					this.xRU = rot_x1+degrees2;		// rotate/tilt phone up
+					this.xRD = rot_x1-degrees2;		// rotate/tilt phone down
+
+					this.zRI = rot_z1+degrees3;		// rotate/tilt phone forward
+					this.zRO = rot_z1-degrees3;		// rotate/tilt phone down
+				},
+				tick:function()
+				{
+					var rot_x2 = document.querySelector('#CAMERA').object3D.rotation.x;
+					var rot_y2 = document.querySelector('#CAMERA').object3D.rotation.y;
+					var rot_z2 = document.querySelector('#CAMERA').object3D.rotation.z;
+					var box = document.querySelector('#' + this.data.popupbox);
+
+
+					box.setAttribute('rotation',{
+						x: THREE.Math.radToDeg(box.object3D.rotation.x),
+						y: THREE.Math.radToDeg(box.object3D.rotation.y),
+						z: THREE.Math.radToDeg(box.object3D.rotation.z)
+					});
+					if (rot_y2 >= this.yRL)
+					{
+						box.setAttribute('rotation',{
+							x: THREE.Math.radToDeg(box.object3D.rotation.x),
+							y: THREE.Math.radToDeg(box.object3D.rotation.y)-1,
+							z: THREE.Math.radToDeg(box.object3D.rotation.z)
+						});
+					}
+					else if (rot_y2 <= this.yRR)
+					{
+						box.setAttribute('rotation',{
+							x: THREE.Math.radToDeg(box.object3D.rotation.x),
+							y: THREE.Math.radToDeg(box.object3D.rotation.y)+1,
+							z: THREE.Math.radToDeg(box.object3D.rotation.z)
+						});
+					}
+					else if (rot_x2 >= this.xRU)
+					{
+						box.setAttribute('rotation',{
+							x: THREE.Math.radToDeg(box.object3D.rotation.x)+1,
+							y: THREE.Math.radToDeg(box.object3D.rotation.y),
+							z: THREE.Math.radToDeg(box.object3D.rotation.z)
+						});
+					}
+					else if (rot_x2 <= this.xRD)
+					{
+						box.setAttribute('rotation',{
+							x: THREE.Math.radToDeg(box.object3D.rotation.x)-1,
+							y: THREE.Math.radToDeg(box.object3D.rotation.y),
+							z: THREE.Math.radToDeg(box.object3D.rotation.z)
+						});
+					}
+					else if (rot_z2 >= this.zRI)
+					{
+						//console.log("+zz");
+					}
+					else if (rot_z2 <= this.zRO)
+					{
+						//console.log("-zz");
+					}
+
+				}
+			});
+
+
+
+		var current_pos = 0;
+		function add_pos()
+		{
+			current_pos = current_pos + 1;
+			console.log(current_pos);
+			if (current_pos > 3)
+				current_pos = 0;
+		}
+		function sub_pos()
+		{
+			current_pos = current_pos - 1;
+		}
+
+
+        // listener for gaze button &amp; changes video
+        AFRAME.registerComponent('next-cursor-listener-1', {
+            init: function () {
+                var lastIndex = 0;
+
+
+                var SCENES = ['R1.jpg','R2.jpg','R3.jpg','R4.jpg'];
+
+                this.el.addEventListener('click', function (evt) {
+                    add_pos();
+                    //lastIndex = (lastIndex + 1) % SCENES.length;
+                    document.querySelector("#a").setAttribute('src', SCENES[current_pos]); // changes src of the video (with id 'sky') to next in list
+                    var sceneEl_0 = document.querySelector('a-scene');
+                    switch(current_pos)
+                    {
+                        case 0: // [should not execute on next button]
+                            // popup box
+                            console.log("case zero");
+                            var entityEl_0 = document.createElement('a-entity');
+                            entityEl_0.setAttribute('id','s0_pubox_1');
+                            entityEl_0.setAttribute('material', {color: 'blue'});
+                            entityEl_0.setAttribute('position', {x: -15.0, y: 0.3, z: 0.0});
+                            entityEl_0.setAttribute('geometry', {primitive: 'sphere'});
+                            entityEl_0.setAttribute('cursor-listener-2',"");
+                            sceneEl_0.appendChild(entityEl_0);
+
+
+                            // previous sphere
+                            var entityEl_11 = document.createElement('a-entity');
+                            entityEl_11.setAttribute('id','PREVIOUS');
+                            entityEl_11.setAttribute('position', {x: -4.0, y: 0.3, z:-3.0});
+                            entityEl_11.setAttribute('material', {color: 'blue', transparent: 'true', opacity: 0.2,});
+                            entityEl_11.setAttribute('previous-cursor-listener-1',"");
+                            entityEl_11.setAttribute('geometry',{primitive: 'sphere'});
+
+                            sceneEl_0.appendChild(entityEl_11);
+
+                            // previous text
+                            var entityEl_text1 = document.createElement('a-text');
+                            entityEl_text1.setAttribute('id','text_next');
+                            entityEl_text1.setAttribute('text',{font:'kelsonsans', value:'Previous',width: 6});
+                            entityEl_text1.setAttribute('position',{x: -2.0, y: 5.2, z: -1.0});
+                            entityEl_text1.setAttribute('rotation', {x: 0, y: 50, z: 0});
+
+                            sceneEl_0.appendChild(entityEl_text1);
+                            break;
+                        case 1: // first scene after next
+                            console.log("case one");
+
+                            // popup box
+                            var next_entityEl_0 = document.createElement('a-entity');
+                            next_entityEl_0.setAttribute('id','s0_pubox_1');
+                            next_entityEl_0.setAttribute('material', {color: 'blue'});
+                            next_entityEl_0.setAttribute('position', {x: -15.0, y: 0.3, z: 0.0});
+                            next_entityEl_0.setAttribute('geometry', {primitive: 'sphere'});
+                            next_entityEl_0.setAttribute('cursor-listener-2',"");
+                            sceneEl_0.appendChild(next_entityEl_0);
+
+
+                            // previous sphere
+                            var next_entityEl_11 = document.createElement('a-entity');
+                            next_entityEl_11.setAttribute('id','PREVIOUS');
+                            next_entityEl_11.setAttribute('position', {x: -4.0, y: 0.3, z:-3.0});
+                            next_entityEl_11.setAttribute('material', {color: 'blue', transparent: 'true', opacity: 0.2});
+                            next_entityEl_11.setAttribute('previous-cursor-listener-1',"");
+                            next_entityEl_11.setAttribute('geometry',{primitive: 'sphere'});
+
+                            sceneEl_0.appendChild(next_entityEl_11);
+
+                            // previous text
+                            var next_entityEl_text1 = document.createElement('a-text');
+                            next_entityEl_text1.setAttribute('id','text_prev');
+                            next_entityEl_text1.setAttribute('text',{font:'kelsonsans', value:'Previous',width: 4});
+                            next_entityEl_text1.setAttribute('position',{x: -2.0, y: 0.2, z: -1.0});
+                            next_entityEl_text1.setAttribute('rotation', {x: 0, y: 50, z: 0});
+
+                            sceneEl_0. appendChild(next_entityEl_text1);
+
+                            break;			// two switch cases for next and previous buttons?
+                        case 2:
+                            console.log("case 2");
+                            var next_remove_n0 = document.querySelector("#s0_pubox_1");
+                            next_remove_n0.parentNode.removeChild(next_remove_n0);
+
+                            // popup box
+                            var next_entityEl_01 = document.createElement('a-entity');
+                            next_entityEl_01.setAttribute('id','s1_pubox_1');
+                            next_entityEl_01.setAttribute('material', {color: 'green'});
+                            next_entityEl_01.setAttribute('position', {x: -15.0, y: 0.3, z: 26.0});
+                            next_entityEl_01.setAttribute('geometry', {primitive: 'sphere'});
+                            //next_entityEl_01.setAttribute('cursor-listener-2',"");
+
+                            sceneEl_0.appendChild(next_entityEl_01);
+
+
+
+                            break;
+                        case 3: // last scene: get rid of Next Button
+                            console.log("case 3");
+
+                            // removes popup box from previous scene
+                            var next_remove_n1 = document.querySelector("#s1_pubox_1");
+                            next_remove_n1.parentNode.removeChild(next_remove_n1);
+
+                            // removes Next button
+                            var remove_next_btn = document.querySelector("#NEXT");
+                            remove_next_btn.parentNode.removeChild(remove_next_btn);
+
+                            // removes next text
+                            var remove_next_text = document.querySelector("#text_next");
+                            remove_next_text.parentNode.removeChild(remove_next_text);
+
+                            // popup box
+                            var entityEl_02 = document.createElement('a-entity');
+                            entityEl_02.setAttribute('id','s2_pubox_1');
+                            entityEl_02.setAttribute('material', {color: 'purple'});
+                            entityEl_02.setAttribute('position', {x: -25.0, y: 0.3, z: 25.0});
+                            entityEl_02.setAttribute('geometry', {primitive: 'sphere'});
+
+                            sceneEl_0.appendChild(entityEl_02);
+                            break;
+                    }
+                    console.log('I was clicked at: ', evt.detail.intersection.point);
+                });
+            }
+        });
+
+        AFRAME.registerComponent('previous-cursor-listener-1', {
+            init: function () {
+                //var lastIndex = -1;
+                var SCENES = ['R1.jpg','R2.jpg','R3.jpg','R4.jpg'];
+                this.el.addEventListener('click', function (evt) {
+                    sub_pos();
+
+                    document.querySelector("#a").setAttribute('src', SCENES[current_pos]); // changes src of the video (with id 'sky') to next in list
+                    var sceneEl_1 = document.querySelector('a-scene');
+                    switch(current_pos)
+                    {
+                        case 0: // 1st scene: remove previous button &amp; text
+                            console.log("prev case zero");
+                            // removes button
+                            var remove_prev_btn = document.querySelector("#PREVIOUS");
+                            remove_prev_btn.parentNode.removeChild(remove_prev_btn);
+
+                            // removes previous text
+                            var remove_prev_text = document.querySelector("#text_prev");
+                            remove_prev_text.parentNode.removeChild(remove_prev_text);
+
+                            // remove popup box
+                            var prev_remove_n2 = document.querySelector("#s0_pubox_1");
+                            prev_remove_n2.parentNode.removeChild(prev_remove_n2);
+
+                            break;
+                        case 1: // first scene after next
+                            console.log("prev case one");
+                            var prev_remove_n1 = document.querySelector("#s1_pubox_1");
+                            prev_remove_n1.parentNode.removeChild(prev_remove_n1);
+
+                            var prev_entityEl_0 = document.createElement('a-entity');
+                            prev_entityEl_0.setAttribute('id','s0_pubox_1');
+                            prev_entityEl_0.setAttribute('material', {color: 'blue'});
+                            prev_entityEl_0.setAttribute('position', {x: -15.0, y: 0.3, z: 0.0});
+                            prev_entityEl_0.setAttribute('geometry', {primitive: 'sphere'});
+                            prev_entityEl_0.setAttribute('cursor-listener-4',"");
+
+                            sceneEl_1.appendChild(prev_entityEl_0);
+
+                            break;			// two switch cases for next and previous buttons?
+                        case 2:
+                            console.log("prev case 2");
+
+                            var prev_remove_n0 = document.querySelector("#s2_pubox_1");
+                            prev_remove_n0.parentNode.removeChild(prev_remove_n0);
+
+                            // next sphere
+                            var prev_entityEl_11 = document.createElement('a-entity');
+                            prev_entityEl_11.setAttribute('id','NEXT');
+                            prev_entityEl_11.setAttribute('position', {x: -1, y: 0.5, z: -6});
+                            prev_entityEl_11.setAttribute('material', {color: 'red', transparent: 'true', opacity: 0.2});
+                            prev_entityEl_11.setAttribute('next-cursor-listener-1',"");
+                            prev_entityEl_11.setAttribute('geometry',{primitive: 'sphere'});
+
+                            sceneEl_1.appendChild(prev_entityEl_11);
+
+                            // next text
+                            var prev_entityEl_text1 = document.createElement('a-text');
+                            prev_entityEl_text1.setAttribute('id','text_next');
+                            prev_entityEl_text1.setAttribute('text',{font:'kelsonsans', value:'Next',width: 4});
+                            prev_entityEl_text1.setAttribute('position',{x: -0.5, y: 0.2, z: -2});
+                            prev_entityEl_text1.setAttribute('rotation', {x: 0, y: 15, z: 0});
+
+                            sceneEl_1. appendChild(prev_entityEl_text1);
+
+
+                            // popup box
+                            var prev_entityEl_01 = document.createElement('a-entity');
+                            prev_entityEl_01.setAttribute('id','s1_pubox_1');
+                            prev_entityEl_01.setAttribute('material', {color: 'green'});
+                            prev_entityEl_01.setAttribute('position', {x: -15.0, y: 0.3, z: 26.0});
+                            prev_entityEl_01.setAttribute('geometry', {primitive: 'sphere'});
+                            //prev_entityEl_01.setAttribute('cursor-listener-2',"");
+
+                            sceneEl_1.appendChild(prev_entityEl_01);
+                            break;
+                        case 3: // [should not execute on next button]
+                            console.log("prev case 3");
+
+                            break;
+                    }
+                    console.log('I was clicked at: 2', evt.detail.intersection.point);
+                });
+            }
+        });
+
+        // listener for gaze button &amp; adds things
+        AFRAME.registerComponent('cursor-listener-2', {
+            init: function () {
+                this.el.addEventListener('click', function (evt) {
+                    var sceneEl = document.querySelector('a-scene');
+                    //var entityEl_1 = document.createElement('a-obj-model');
+                    var entityEl_1 = document.createElement('a-sphere');
+                    entityEl_1.setAttribute('id','popup_box');											// set popup_box
+                    entityEl_1.setAttribute('position', {x: -5.0, y: 0.0, z: -0.5});
+                    entityEl_1.setAttribute('rotation', {x: 0, y: 0, z: 0});
+                    entityEl_1.setAttribute('src','map.jpg');
+                    entityEl_1.setAttribute('head-tracker', "popupbox:popup_box");
+                    sceneEl.appendChild(entityEl_1);
+
+                    var entityEl_2 = document.createElement('a-image');
+                    entityEl_2.setAttribute('id','closeBox');
+                    entityEl_2.setAttribute('geometry', {primitive: 'plane', height: 1, width: 1});
+                    entityEl_2.setAttribute('position',{x: -5.7, y: -3.2, z: -0.3});
+                    entityEl_2.setAttribute('rotation', {x: -10, y: 80, z: 0});
+                    entityEl_2.setAttribute('src', "close.jpg");
+                    entityEl_2.setAttribute('material', {color: 'blue'});
+                    entityEl_2.setAttribute('cursor_listener_3',"");										// set listner for REMOVE popup_box
+                    sceneEl.appendChild(entityEl_2);
+
+                    document.getElementById('hotspot_1').setAttribute('visible', 'false');
+                });
+            }
+        });
+        // remove popup_box
+            AFRAME.registerComponent('cursor_listener_3', {
+                init: function (){
+                    this.el.addEventListener('click', function (evt) {
+                        var removePUB = document.querySelector('#popup_box');
+                        removePUB.parentNode.removeChild(removePUB);
+
+                        var removeBox = document.querySelector('#closeBox');
+                        removeBox.parentNode.removeChild(removeBox);
+
+                        document.getElementById('hotspot_1').setAttribute('visible', 'true');
+                    });
+                }
+            });
+
+            AFRAME.registerComponent('cursor-listener-4', {
+                init: function () {
+                    this.el.addEventListener('click', function (evt) {
+                        var sceneEl_2 = document.querySelector('a-scene');
+                        var entityEl_5 = document.createElement('a-obj-model');
+                       // var entityEl_5 = document.createElement('a-sphere');
+                        entityEl_5.setAttribute('id','popup_box_2');											// set popup_box
+                        // entityEl_1.setAttribute('geometry', {height: 2, depth: 2, width: 3});
+                        entityEl_5.setAttribute('position', {x: -4.121, y: -1.0, z: 3.296});
+                        entityEl_5.setAttribute('rotation', {x: 0, y: 0, z: 0});
+                        //entityEl_1.setAttribute('material', {color:'purple'});
+                       // entityEl_5.setAttribute('src','map.jpg');
+                         entityEl_5.setAttribute('src','assets/dog.obj');
+                         entityEl_5.setAttribute('mtl','assets/dog.mtl');
+                         entityEl_5.setAttribute('scale',{x: 1/25, y: 1/25, z:1/25});
+                        entityEl_5.setAttribute('head-tracker', "popupbox:popup_box_2");
+                        //entityEl_1.setAttribute('tri-perimeter',"");
+                        sceneEl_2.appendChild(entityEl_5);
+
+
+                        var entityEl_7 = document.createElement('a-image');
+                        entityEl_7.setAttribute('id','closeBox_2');
+                        entityEl_7.setAttribute('geometry', {primitive: 'plane', height: 1, width: 1});
+                        entityEl_7.setAttribute('position',{x: -4.198, y: -2.859, z: 3.489});
+                        entityEl_7.setAttribute('rotation', {x: -10.027, y: 130.348, z: 0});
+                        entityEl_7.setAttribute('material', {color: 'blue'});
+                        entityEl_7.setAttribute('src', 'close.jpg');
+                        entityEl_7.setAttribute('cursor_listener_8',"");										// set listner for REMOVE popup_box
+                        sceneEl_2.appendChild(entityEl_7);
+
+                        document.getElementById('hotspot_2').setAttribute('visible', 'false');
+                    });
+                }
+            });
+
+            AFRAME.registerComponent('cursor_listener_8', {
+                init: function (){
+                    this.el.addEventListener('click', function (evt) {
+                        var removePUB = document.querySelector('#popup_box_2');
+                        removePUB.parentNode.removeChild(removePUB);
+
+
+                        var removeBox = document.querySelector('#closeBox_2');
+                        removeBox.parentNode.removeChild(removeBox);
+
+                        document.getElementById('hotspot_2').setAttribute('visible', 'true');
+                    });
+                }
+            });
+        </script>
+	</head>
+
+	<body>
+
+		<a-scene>
+			<a-assets>
+				<!-- first scene -->
+				<img id="sky" src="R1.jpg">
+			</a-assets>
+
+			<!-- display video -->
+			<a-sky id="a" src="#sky" rotation="0 -130 0"></a-sky>
+			<!--a-plane src="scary-face.jpg" height="2" width="3" rotation="0 75 0" position="-1.0 0.0 -0.5"></a-plane-->
+			<!-- enables look controls -->
+			<a-entity id="CAMERA" tri-perimeter="" camera="" look-controls="">
+
+			  <!-- enables ring for gaze -->
+			  <a-entity cursor="fuse: true; fuseTimeout: 2000"
+						position="0 0 -1"
+						geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+						material="color: black; shader: flat">
+			  </a-entity>
+			</a-entity>
+
+            <!-- object for user to gaze upon to change scene -->
+            <!--a-entity id="NEXT" position="-1 0.5 -6" material="color:red;transparent:true;opacity:0.2" next-cursor-listener-1="" geometry="primitive:sphere" rotation="0 0 0" scale="1 1 1" visible="true"></a-entity>
+            <a-text id="text_next" font="kelsonsans" value="Next" width="4" position="-0.5 0.2 -2" rotation="0 15 0" scale="1 1 1" visible="true" text="anchor:align;width:4;font:kelsonsans;value:Next"></a-text-->
+
+            <!-- object for user to gaze upon to change scene -->
+            <!--a-entity id="ball_2" position="-4.0 0.3 -3.0" material="color: blue; transparent: true; opacity: 0.2;" previous-cursor-listener-1="" geometry="primitive: sphere" ></a-entity>
+            <a-text id="text_previous" font="kelsonsans" value="Previous" width="4" position="-2.0 0.2 -1.0"
+              rotation="0 50 0"></a-text-->
+			<a-entity id="RP" position="26.0 0.0 -26.0" material="color:yellow" geometry="primitive:sphere" rotation="0 0 0" scale="1 1 1" visible="true"></a-entity>
+			<a-entity id="MP" position="26.0 0.0 -26.0" material="color:yellow" geometry="primitive:sphere" rotation="0 0 0" scale="1 1 1" visible="true"></a-entity>
+			<a-entity id="LP" position="-26.0 0.0 -26.0" material="color:yellow" geometry="primitive:sphere" rotation="0 0 0" scale="1 1 1" visible="true"></a-entity>
+			<!-- object for user to gaze upon to change scene -->
+            <a-entity id="hotspot_1" position="-10.123 0.3 -0.830" material="color:#1b1be4; src:eye.png; transparent: true;" cursor-listener-2="" geometry="primitive:box" rotation="0 0 0" scale="2 2 2" visible="false"></a-entity>
+			<a-entity id="hotspot_2" position="-7.198 0.3 6.729" rotation="0.0 -43.086 0.0" material="color:#1b1be4; src:eye.png; transparent: true;" cursor-listener-4="" geometry="primitive:box" rotation="0 0 0" scale="2 2 2" visible="false"></a-entity>
+		</a-scene>
+	</body>
+</html>
